@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Auditor | Private Finance Engine
 
-## Getting Started
+Auditor is a premium, highly-private personal finance tool tailored for individuals who want complete control over their financial data. It allows users to upload financial documents, automatically extract transactions using Google's Gemini AI, and track multi-currency cash flows without vendor lock-in.
 
-First, run the development server:
+## Key Features
+- **Local Document Storage**: Retain your private financial PDFs strictly on your own hardware. 
+- **AI-Powered Extraction**: Contextually rips transaction headers from statements directly via Google Gemini 1.5 Pro.
+- **Multi-Currency Engine**: Log and compare Net Worth over time natively across standard base and custom currencies.
+- **Glassmorphism Premium UI**: Built with pure Tailwind CSS for an incredibly sleek, dark-themed experience.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## 🚀 Environment Setup Guide
+
+To run Auditor, prioritize making sure your `.env` contains the required fields:
+```env
+# Database configuration 
+DATABASE_URL="postgresql://auditor:securepassword123@localhost:5432/finance_auditor?schema=public"
+
+# Gemini AI Key (Required for Document Extraction)
+GEMINI_API_KEY="your_actual_key"
+
+# NextAuth Config (Required to bypass NextAuth warnings)
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="supersecretnextauthkey12345"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 🧑‍💻 Local Development Guide (Recommended! Fast refresh)
+For editing the code and instantly seeing changes via Hot Module Replacement:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Start the database container only** (Requires Docker Desktop running)
+   ```bash
+   docker-compose up -d db
+   ```
+2. **Push the database schema** to initialize the empty Postgres instance:
+   ```bash
+   npx prisma db push
+   ```
+3. **Start the Next.js UI Locally**:
+   ```bash
+   npm run dev
+   ```
+4. **Access the application**: open `http://localhost:3000`
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+### 📦 Production & Self-Hosting Guide (Full Containerization)
+When you're ready to deploy or want to test the hardened standalone container:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Spin down any local dev servers running to free up Port 3000.
+2. Build and compose the full stack (this automatically triggers the Next.js standalone build):
+   ```bash
+   docker-compose up -d --build
+   ```
+3. You will need to explicitly ensure the Prisma schema is migrated against this database if you hadn't already (since they share the same volume):
+   ```bash
+   npx prisma db push
+   ```
+4. Application is live at `http://localhost:3000` isolated completely in Docker!
