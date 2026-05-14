@@ -40,6 +40,24 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  min-width: 320px;
+  overscroll-behavior-y: none;
+  text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
+}
+
+button,
+a,
+input,
+select {
+  touch-action: manipulation;
+}
+
+@media (max-width: 640px) {
+  .glass {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
 }
 
 .glass {

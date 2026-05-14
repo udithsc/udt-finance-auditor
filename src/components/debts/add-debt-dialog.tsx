@@ -5,7 +5,7 @@ import { addDebt } from "@/app/actions/debts";
 import { Dialog } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
 
-export function AddDebtButton() {
+export function AddDebtButton({ baseCurrency, currencies }: { baseCurrency: string; currencies: string[] }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
 
@@ -26,7 +26,7 @@ export function AddDebtButton() {
     <>
       <button 
         onClick={() => setIsOpen(true)}
-        className="px-4 py-2 text-sm font-medium flex items-center gap-2 bg-red-500/80 hover:bg-red-500 text-white rounded-xl transition-all shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+        className="w-full justify-center px-4 py-2.5 text-sm font-medium flex items-center gap-2 bg-red-500/80 hover:bg-red-500 text-white rounded-xl transition-all shadow-[0_0_15px_rgba(239,68,68,0.3)] sm:w-auto"
       >
         <Plus className="w-4 h-4"/> Add New Debt
       </button>
@@ -45,6 +45,19 @@ export function AddDebtButton() {
               <option value="CREDIT_CARD">Credit Card</option>
               <option value="INSTALLMENT">Installment</option>
               <option value="OTHER">Other</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Currency</label>
+            <select
+              name="currency"
+              defaultValue={baseCurrency}
+              className="bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all appearance-none cursor-pointer"
+            >
+              {currencies.map((currency) => (
+                <option value={currency} key={currency}>{currency}</option>
+              ))}
             </select>
           </div>
 

@@ -2,6 +2,8 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { getCurrentUser } from "@/lib/current-user";
+import { getAppSettings } from "@/lib/app-settings";
 
 export async function addAsset(formData: FormData) {
   console.log("Adding asset...");
@@ -13,8 +15,8 @@ export async function addAsset(formData: FormData) {
   const purchasedValue = formData.get("purchasedValue") ? Math.round(parseFloat(formData.get("purchasedValue") as string) * 100) / 100 : null;
   const notes = formData.get("notes") as string;
 
-  const user = await prisma.user.findFirst();
-  if (!user) return { error: "No user found" };
+  const user = await getCurrentUser();
+  const settings = await getAppSettings();
 
   try {
     const asset = await prisma.asset.create({
@@ -23,6 +25,7 @@ export async function addAsset(formData: FormData) {
         name,
         type,
         value,
+        currency: settings.baseCurrency,
         quantity,
         purchasedValue,
         purchasedAt: purchasedAtStr ? new Date(purchasedAtStr) : null,

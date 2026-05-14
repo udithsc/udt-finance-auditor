@@ -14,7 +14,7 @@ export function Dialog({ isOpen, onClose, title, children }: DialogProps) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-end justify-center p-2 sm:items-center sm:p-4">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -26,18 +26,18 @@ export function Dialog({ isOpen, onClose, title, children }: DialogProps) {
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-lg glass border border-white/10 rounded-3xl shadow-2xl overflow-hidden"
+            className="relative w-full max-w-lg glass border border-white/10 rounded-3xl shadow-2xl overflow-hidden max-h-[92dvh]"
           >
-            <div className="flex items-center justify-between p-6 border-b border-white/5">
-              <h3 className="text-xl font-bold text-white tracking-tight">{title}</h3>
+            <div className="flex items-center justify-between gap-3 p-4 border-b border-white/5 sm:p-6">
+              <h3 className="min-w-0 truncate text-lg font-bold text-white tracking-tight sm:text-xl">{title}</h3>
               <button
                 onClick={onClose}
-                className="p-2 rounded-xl hover:bg-white/5 text-zinc-400 hover:text-white transition-all"
+                className="shrink-0 p-2 rounded-xl hover:bg-white/5 text-zinc-400 hover:text-white transition-all"
               >
                 <X size={20} />
               </button>
             </div>
-            <div className="p-6">
+            <div className="max-h-[calc(92dvh-72px)] overflow-y-auto p-4 sm:p-6">
               {children}
             </div>
           </motion.div>

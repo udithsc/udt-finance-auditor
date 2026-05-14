@@ -5,15 +5,18 @@ import { prisma } from "./prisma";
 
 // Configured allowed user email via .env
 const ALLOWED_EMAIL = process.env.ALLOWED_EMAIL;
+const providers = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+  ? [
+      GoogleProvider({
+        clientId: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      }),
+    ]
+  : [];
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || "dummy_client_id",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "dummy_client_secret",
-    }),
-  ],
+  providers,
   session: {
     strategy: "jwt",
   },
@@ -27,7 +30,7 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user && token.sub) {
-        (session.user as any).id = token.sub;
+        (session.user as typeof session.user & { id: string }).id = token.sub;
       }
       return session;
     },

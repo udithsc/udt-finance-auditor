@@ -1,6 +1,7 @@
 "use server";
 
 import { getExchangeRates } from "./currency";
+import { getAppSettings } from "@/lib/app-settings";
 
 export async function getCsePrice(symbol: string) {
   try {
@@ -14,19 +15,15 @@ export async function getCsePrice(symbol: string) {
     
     const data = await response.json();
     
-    // The API returns trade_price in LKR
     const priceLKR = parseFloat(data.last_traded_price || data.trade_price || "0");
-    
-    // Get LKR to MYR exchange rate
-    const rateResult = await getExchangeRates();
-    const lkrToMyrRate = rateResult.rates.LKR; // This is LKR per 1 MYR
-    
-    // Convert LKR to MYR: valueInMYR = priceLKR / ratePerMYR
-    const priceMYR = priceLKR / lkrToMyrRate;
+    const settings = await getAppSettings();
+    const rateResult = await getExchangeRates("LKR", [settings.baseCurrency]);
+    const lkrToBaseRate = rateResult.rates[settings.baseCurrency] || 0;
+    const price = priceLKR * lkrToBaseRate;
 
     return {
       success: true,
-      price: priceMYR,
+      price,
       priceLKR: priceLKR,
       companyName: data.name
     };

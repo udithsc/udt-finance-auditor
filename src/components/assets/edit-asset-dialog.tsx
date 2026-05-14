@@ -4,8 +4,9 @@ import { useState } from "react";
 import { updateAsset } from "@/app/actions/assets";
 import { Dialog } from "@/components/ui/dialog";
 import { Edit2, Save } from "lucide-react";
+import type { Asset } from "@prisma/client";
 
-export function EditAssetButton({ asset }: { asset: any }) {
+export function EditAssetButton({ asset, baseCurrency }: { asset: Asset; baseCurrency: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
 
@@ -41,7 +42,7 @@ export function EditAssetButton({ asset }: { asset: any }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Current Value (MYR)</label>
+              <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Current Value ({baseCurrency})</label>
               <input required name="value" type="number" defaultValue={asset.value} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white" />
             </div>
             <div className="flex flex-col gap-1.5">

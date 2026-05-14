@@ -1,53 +1,69 @@
 import { prisma } from "@/lib/prisma";
-import { Plus, Landmark, CreditCard, Building, History } from "lucide-react";
+import type { Debt } from "@prisma/client";
+import { Landmark, History } from "lucide-react";
 import { AddDebtButton } from "@/components/debts/add-debt-dialog";
 import { EditDebtButton } from "@/components/debts/edit-debt-dialog";
 import { DeleteDebtButton } from "@/components/debts/delete-debt-button";
+import { getAppSettings } from "@/lib/app-settings";
+import { getExchangeRates } from "@/app/actions/currency";
+
+export const dynamic = "force-dynamic";
 
 export default async function DebtsPage() {
-  let debts: any[] = [];
-  let dbError = false;
+  let debts: Debt[] = [];
+  const settings = await getAppSettings();
+  let rates: Record<string, number> = { [settings.baseCurrency]: 1 };
 
   try {
     debts = await prisma.debt.findMany();
+    const rateResult = await getExchangeRates(settings.baseCurrency, Array.from(new Set([
+      ...settings.displayCurrencies,
+      ...debts.map((debt) => debt.currency),
+    ])));
+    if (rateResult.success) rates = rateResult.rates;
   } catch (err) {
     console.error("Failed to fetch debts:", err);
-    dbError = true;
   }
 
-  const totalDebt = debts.reduce((acc, debt) => Math.round((acc + debt.remaining) * 100) / 100, 0);
-  const totalMonthly = debts.reduce((acc, debt) => Math.round((acc + (debt.monthly || 0)) * 100) / 100, 0);
+  const toBaseAmount = (amount: number, currency: string) => {
+    const rate = rates[currency];
+    if (!currency || currency === settings.baseCurrency || !rate) return amount;
+    return amount / rate;
+  };
+
+  const totalDebt = debts.reduce((acc, debt) => Math.round((acc + toBaseAmount(debt.remaining, debt.currency)) * 100) / 100, 0);
+  const totalMonthly = debts.reduce((acc, debt) => Math.round((acc + toBaseAmount(debt.monthly || 0, debt.currency)) * 100) / 100, 0);
 
   return (
-    <div className="flex flex-col gap-8 pb-12 w-full mx-auto">
+    <div className="flex flex-col gap-5 pb-8 w-full mx-auto sm:gap-8 sm:pb-12">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Liabilities & Debts</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Liabilities & Debts</h1>
           <p className="text-zinc-500 mt-1">Manage your loans, credit cards, and recurring repayments.</p>
         </div>
-        <div className="flex gap-4">
-          <div className="glass px-6 py-3 rounded-2xl border border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.1)] text-right">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+          <div className="glass px-4 py-3 rounded-2xl border border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.1)] sm:px-6 sm:text-right">
             <p className="text-xs text-zinc-500 uppercase font-semibold tracking-wider">Total Outstanding</p>
-            <p className="text-2xl font-bold text-red-400">MYR {totalDebt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+            <p className="text-2xl font-bold text-red-400">{settings.baseCurrency} {totalDebt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
           </div>
-          <div className="glass px-6 py-3 rounded-2xl border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)] text-right">
+          <div className="glass px-4 py-3 rounded-2xl border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)] sm:px-6 sm:text-right">
             <p className="text-xs text-zinc-500 uppercase font-semibold tracking-wider">Monthly Commitment</p>
-            <p className="text-2xl font-bold text-blue-400">MYR {totalMonthly.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+            <p className="text-2xl font-bold text-blue-400">{settings.baseCurrency} {totalMonthly.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
           </div>
         </div>
       </div>
 
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold flex items-center gap-2 text-white">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-lg font-semibold flex items-center gap-2 text-white sm:text-xl">
             <History className="text-primary w-5 h-5"/> active Liabilities
           </h2>
-          <AddDebtButton />
+          <AddDebtButton baseCurrency={settings.baseCurrency} currencies={settings.displayCurrencies} />
         </div>
 
         <div className="glass rounded-3xl border border-white/5 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full min-w-[820px] text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/5 bg-white/[0.02]">
                   <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Creditor / Loan Name</th>
@@ -83,10 +99,10 @@ export default async function DebtsPage() {
                           <span className="text-xs font-medium px-2 py-1 rounded-lg bg-white/5 text-zinc-300 border border-white/5">{debt.type}</span>
                         </td>
                         <td className="px-6 py-4 text-zinc-400 text-sm">
-                          MYR {debt.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          {debt.currency} {debt.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <span className="font-semibold text-red-400">{debt.remaining.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          <span className="font-semibold text-red-400">{debt.currency} {debt.remaining.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </td>
                         <td className="px-6 py-4">
                            <div className="flex flex-col gap-1.5 w-32 ml-auto">
@@ -101,7 +117,7 @@ export default async function DebtsPage() {
                         </td>
                         <td className="px-6 py-4">
                            <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                             <EditDebtButton debt={debt} />
+                             <EditDebtButton debt={debt} currencies={settings.displayCurrencies} />
                              <DeleteDebtButton id={debt.id} />
                            </div>
                         </td>

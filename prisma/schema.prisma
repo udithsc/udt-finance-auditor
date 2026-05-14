@@ -54,6 +54,12 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
 model Document {
   id            String        @id @default(cuid())
   userId        String
@@ -73,12 +79,12 @@ model Transaction {
   date         DateTime
   description  String
   amount       Float
-  currency     String    @default("MYR")
+  currency     String
   type         String
   isInternal   Boolean   @default(false)
   category     String?
   installment  String?
-  baseCurrency String    @default("MYR")
+  baseCurrency String
   baseAmount   Float?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -93,7 +99,7 @@ model Asset {
   name           String
   type           String
   value          Float
-  currency       String    @default("MYR")
+  currency       String
   quantity       Float?
   notes          String?
   updatedAt      DateTime  @updatedAt
@@ -110,7 +116,7 @@ model Debt {
   totalAmount Float
   remaining   Float
   monthly     Float?
-  currency    String   @default("MYR")
+  currency    String
   notes       String?
   updatedAt   DateTime @updatedAt
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)

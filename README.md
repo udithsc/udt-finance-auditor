@@ -29,19 +29,30 @@ NEXTAUTH_SECRET="supersecretnextauthkey12345"
 ### 🧑‍💻 Local Development Guide (Recommended! Fast refresh)
 For editing the code and instantly seeing changes via Hot Module Replacement:
 
-1. **Start the database container only** (Requires Docker Desktop running)
+1. **Create your local env file**
    ```bash
-   docker-compose up -d db
+   cp .env.example .env
    ```
-2. **Push the database schema** to initialize the empty Postgres instance:
+2. **Start the database container only** (Requires Docker Desktop running)
    ```bash
-   npx prisma db push
+   npm run db:up
    ```
-3. **Start the Next.js UI Locally**:
+3. **Push the database schema** to initialize the empty Postgres instance:
+   ```bash
+   npm run db:push
+   ```
+4. **Start the Next.js UI Locally**:
    ```bash
    npm run dev
    ```
-4. **Access the application**: open `http://localhost:3000`
+5. **Access the application**: open `http://localhost:3000`
+
+Useful database commands:
+```bash
+npm run db:up       # start Postgres
+npm run db:down     # stop containers
+npm run db:studio   # inspect data with Prisma Studio
+```
 
 ---
 

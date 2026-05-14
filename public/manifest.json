@@ -2,16 +2,41 @@
   "name": "UDT Finance Auditor",
   "short_name": "Auditor",
   "description": "Private, AI-powered financial asset and debt tracker.",
+  "id": "/dashboard",
   "start_url": "/dashboard",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#09090b",
-  "theme_color": "#3b82f6",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#050505",
+  "theme_color": "#050505",
+  "categories": ["finance", "productivity", "utilities"],
   "icons": [
     {
       "src": "/icon.png",
       "sizes": "192x192 512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "/dashboard",
+      "icons": [{ "src": "/icon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Transactions",
+      "short_name": "Transactions",
+      "url": "/transactions",
+      "icons": [{ "src": "/icon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Assets",
+      "short_name": "Assets",
+      "url": "/assets",
+      "icons": [{ "src": "/icon.png", "sizes": "192x192" }]
     }
   ]
 }

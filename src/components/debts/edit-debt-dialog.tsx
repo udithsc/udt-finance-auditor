@@ -4,18 +4,20 @@ import { useState } from "react";
 import { Edit2, Loader2, X } from "lucide-react";
 import { updateDebt } from "@/app/actions/debts";
 import { useRouter } from "next/navigation";
+import type { Debt } from "@prisma/client";
 
-export function EditDebtButton({ debt }: { debt: any }) {
+export function EditDebtButton({ debt, currencies }: { debt: Debt; currencies: string[] }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const router = useRouter();
+  const currencyOptions = Array.from(new Set([debt.currency, ...currencies]));
 
   const [formData, setFormData] = useState({
     name: debt.name,
     type: debt.type,
-    totalAmount: debt.totalAmount,
-    remaining: debt.remaining,
-    monthly: debt.monthly || "",
+    totalAmount: String(debt.totalAmount),
+    remaining: String(debt.remaining),
+    monthly: debt.monthly ? String(debt.monthly) : "",
     currency: debt.currency,
     notes: debt.notes || "",
   });
@@ -93,9 +95,9 @@ export function EditDebtButton({ debt }: { debt: any }) {
                     onChange={e => setFormData({...formData, currency: e.target.value})}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:border-primary outline-none"
                   >
-                    <option value="MYR">MYR</option>
-                    <option value="USD">USD</option>
-                    <option value="LKR">LKR</option>
+                    {currencyOptions.map((currency) => (
+                      <option value={currency} key={currency}>{currency}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -107,7 +109,7 @@ export function EditDebtButton({ debt }: { debt: any }) {
                     type="number" 
                     step="0.01"
                     value={formData.totalAmount} 
-                    onChange={e => setFormData({...formData, totalAmount: e.target.value as any})}
+                    onChange={e => setFormData({...formData, totalAmount: e.target.value})}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:border-primary outline-none" 
                     required
                   />
@@ -118,7 +120,7 @@ export function EditDebtButton({ debt }: { debt: any }) {
                     type="number" 
                     step="0.01"
                     value={formData.remaining} 
-                    onChange={e => setFormData({...formData, remaining: e.target.value as any})}
+                    onChange={e => setFormData({...formData, remaining: e.target.value})}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:border-primary outline-none" 
                     required
                   />
@@ -131,7 +133,7 @@ export function EditDebtButton({ debt }: { debt: any }) {
                   type="number" 
                   step="0.01"
                   value={formData.monthly} 
-                  onChange={e => setFormData({...formData, monthly: e.target.value as any})}
+                  onChange={e => setFormData({...formData, monthly: e.target.value})}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:border-primary outline-none" 
                 />
               </div>

@@ -1,17 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { Calculator, Calendar, DollarSign, Percent } from "lucide-react";
 
-export function LoanCalculator() {
+export function LoanCalculator({ currency }: { currency: string }) {
   const [amount, setAmount] = useState<number>(10000);
   const [interest, setInterest] = useState<number>(5);
   const [years, setYears] = useState<number>(5);
-  const [monthlyPayment, setMonthlyPayment] = useState<number>(0);
-  const [totalInterest, setTotalInterest] = useState<number>(0);
-  const [totalPayment, setTotalPayment] = useState<number>(0);
 
-  useEffect(() => {
+  const { monthlyPayment, totalInterest, totalPayment } = useMemo(() => {
     const principal = amount;
     const calculatedInterest = interest / 100 / 12;
     const calculatedPayments = years * 12;
@@ -19,11 +16,16 @@ export function LoanCalculator() {
     const x = Math.pow(1 + calculatedInterest, calculatedPayments);
     const monthly = (principal * x * calculatedInterest) / (x - 1);
 
-    if (isFinite(monthly)) {
-      setMonthlyPayment(monthly);
-      setTotalPayment(monthly * calculatedPayments);
-      setTotalInterest(monthly * calculatedPayments - principal);
+    if (!Number.isFinite(monthly)) {
+      return { monthlyPayment: 0, totalInterest: 0, totalPayment: 0 };
     }
+
+    const totalPayment = monthly * calculatedPayments;
+    return {
+      monthlyPayment: monthly,
+      totalInterest: totalPayment - principal,
+      totalPayment,
+    };
   }, [amount, interest, years]);
 
   return (
@@ -77,15 +79,15 @@ export function LoanCalculator() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
         <div className="bg-primary/5 border border-primary/10 rounded-2xl p-4 text-center">
           <p className="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-1">Monthly Payment</p>
-          <p className="text-2xl font-bold text-primary">MYR {monthlyPayment.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+          <p className="text-2xl font-bold text-primary">{currency} {monthlyPayment.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
           <p className="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-1">Total Interest</p>
-          <p className="text-xl font-bold text-red-400">MYR {totalInterest.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+          <p className="text-xl font-bold text-red-400">{currency} {totalInterest.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
           <p className="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-1">Total Payment</p>
-          <p className="text-xl font-bold text-white">MYR {totalPayment.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+          <p className="text-xl font-bold text-white">{currency} {totalPayment.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
         </div>
       </div>
     </div>

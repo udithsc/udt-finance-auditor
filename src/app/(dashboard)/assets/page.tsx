@@ -1,14 +1,18 @@
 import { prisma } from "@/lib/prisma";
-import { Plus, Coins, TrendingUp, Wallet, Landmark, Fuel, Car, Calendar, ArrowUpRight, ArrowDownRight, Globe } from "lucide-react";
+import type { Asset } from "@prisma/client";
+import { Coins, TrendingUp, Calendar, ArrowUpRight, ArrowDownRight, Globe } from "lucide-react";
 import { AddAssetButton } from "@/components/assets/add-asset-dialog";
 import { EditAssetButton } from "@/components/assets/edit-asset-dialog";
 import { DeleteAssetButton } from "@/components/assets/delete-asset-button";
 import { getExchangeRates } from "@/app/actions/currency";
+import { getAppSettings } from "@/lib/app-settings";
+
+export const dynamic = "force-dynamic";
 
 export default async function AssetsPage() {
-  let assets: any[] = [];
-  let dbError = false;
-  let rates: any = { MYR: 1, USD: 0.21, LKR: 65.0 };
+  let assets: Asset[] = [];
+  const settings = await getAppSettings();
+  let rates: Record<string, number> = { [settings.baseCurrency]: 1 };
 
   try {
     assets = await prisma.asset.findMany({
@@ -18,18 +22,16 @@ export default async function AssetsPage() {
     if (rateResult.success) rates = rateResult.rates;
   } catch (err) {
     console.error("Failed to fetch assets:", err);
-    dbError = true;
   }
 
-  const totalValueMYR = assets.reduce((acc, asset) => Math.round((acc + asset.value) * 100) / 100, 0);
-  const totalValueUSD = Math.round(totalValueMYR * rates.USD * 100) / 100;
-  const totalValueLKR = Math.round(totalValueMYR * rates.LKR * 100) / 100;
+  const totalBaseValue = assets.reduce((acc, asset) => Math.round((acc + asset.value) * 100) / 100, 0);
+  const displayCurrencies = settings.displayCurrencies.filter((currency) => currency !== settings.baseCurrency);
 
   return (
-    <div className="flex flex-col gap-8 pb-12 w-full mx-auto">
+    <div className="flex flex-col gap-5 pb-8 w-full mx-auto sm:gap-8 sm:pb-12">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Assets Portfolio</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Assets Portfolio</h1>
           <p className="text-zinc-500 mt-1">Track wealth with multi-currency & performance analysis.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
@@ -38,10 +40,11 @@ export default async function AssetsPage() {
                <Globe className="w-3 h-3 text-emerald-500" />
                <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Net Assets</p>
              </div>
-             <p className="text-xl font-bold text-emerald-400">MYR {totalValueMYR.toLocaleString()}</p>
+             <p className="text-xl font-bold text-emerald-400">{settings.baseCurrency} {totalBaseValue.toLocaleString()}</p>
              <div className="flex gap-2 text-[10px] text-zinc-400 font-medium">
-               <span>USD {totalValueUSD.toLocaleString()}</span>
-               <span>LKR {totalValueLKR.toLocaleString()}</span>
+               {displayCurrencies.map((currency) => (
+                 <span key={currency}>{currency} {Math.round(totalBaseValue * (rates[currency] || 0) * 100) / 100}</span>
+               ))}
              </div>
           </div>
         </div>
@@ -49,16 +52,16 @@ export default async function AssetsPage() {
 
 
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold flex items-center gap-2 text-white">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-lg font-semibold flex items-center gap-2 text-white sm:text-xl">
             <TrendingUp className="text-primary w-5 h-5"/> Portfolio Performance
           </h2>
-          <AddAssetButton rates={rates} />
+          <AddAssetButton rates={rates} baseCurrency={settings.baseCurrency} displayCurrencies={settings.displayCurrencies} />
         </div>
 
         <div className="glass rounded-3xl border border-white/5 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full min-w-[860px] text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/5 bg-white/[0.02]">
                   <th className="px-6 py-4 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Asset</th>
@@ -96,7 +99,7 @@ export default async function AssetsPage() {
                         <td className="px-6 py-4">
                           {asset.purchasedValue ? (
                             <div className="flex flex-col gap-0.5">
-                              <span className="text-sm text-zinc-300">MYR {asset.purchasedValue.toLocaleString()}</span>
+                              <span className="text-sm text-zinc-300">{settings.baseCurrency} {asset.purchasedValue.toLocaleString()}</span>
                               <div className="flex items-center gap-1 text-[10px] text-zinc-500">
                                 <Calendar className="w-2.5 h-2.5" />
                                 {asset.purchasedAt ? new Date(asset.purchasedAt).toLocaleDateString() : 'N/A'}
@@ -106,10 +109,11 @@ export default async function AssetsPage() {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex flex-col items-end gap-0.5">
-                            <span className="font-bold text-white">MYR {asset.value.toLocaleString()}</span>
+                            <span className="font-bold text-white">{settings.baseCurrency} {asset.value.toLocaleString()}</span>
                             <div className="flex gap-1.5 text-[9px] text-zinc-500 font-medium">
-                              <span>USD {(asset.value * rates.USD).toLocaleString()}</span>
-                              <span>LKR {(asset.value * rates.LKR).toLocaleString()}</span>
+                              {displayCurrencies.map((currency) => (
+                                <span key={currency}>{currency} {(asset.value * (rates[currency] || 0)).toLocaleString()}</span>
+                              ))}
                             </div>
                           </div>
                         </td>
@@ -118,7 +122,7 @@ export default async function AssetsPage() {
                             <div className={`flex flex-col items-end gap-0.5 ${gainLoss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                               <div className="flex items-center gap-1 font-bold">
                                 {gainLoss >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                                MYR {Math.abs(gainLoss).toLocaleString()}
+                                {settings.baseCurrency} {Math.abs(gainLoss).toLocaleString()}
                               </div>
                               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-400/10">
                                 {gainLossPercent?.toFixed(2)}%
@@ -128,7 +132,7 @@ export default async function AssetsPage() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center gap-2">
-                            <EditAssetButton asset={asset} />
+                            <EditAssetButton asset={asset} baseCurrency={settings.baseCurrency} />
                             <DeleteAssetButton id={asset.id} />
                           </div>
                         </td>

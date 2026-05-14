@@ -3,10 +3,10 @@
 import { useState, useMemo, useRef } from "react";
 import { 
   Filter, ArrowUpDown, Edit2, Trash2, Banknote, Plus,
-  UploadCloud, FileText, Loader2, CheckCircle2, AlertCircle, PieChart as PieChartIcon, Target, Wallet
+  UploadCloud, FileText, Loader2, CheckCircle2, AlertCircle, PieChart as PieChartIcon, Camera
 } from "lucide-react";
 import clsx from "clsx";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
 import { updateTransaction, deleteTransaction, createTransaction } from "@/app/actions/transaction";
 
@@ -21,27 +21,72 @@ type Transaction = {
   status: string;
 };
 
-export default function TransactionsClient({ initialTransactions, dbError, rates = { MYR: 1, USD: 0.21, LKR: 65.0 } }: { initialTransactions: Transaction[], dbError: boolean, rates?: Record<string, number> }) {
+type EditingTransaction = Omit<Transaction, "amount"> & {
+  amount: number | "";
+};
+
+type NewTransactionForm = {
+  date: string;
+  description: string;
+  amount: string;
+  category: string;
+  currency: string;
+  type: string;
+};
+
+type UploadResult = {
+  transactions?: Transaction[];
+  transactionsCount?: number;
+  error?: string;
+};
+
+type SourceType = "auto" | "bank_statement" | "bill_receipt" | "sms_screenshot" | "payment_confirmation";
+
+const SOURCE_TYPES: Array<{ id: SourceType; label: string }> = [
+  { id: "auto", label: "Auto" },
+  { id: "bank_statement", label: "Statement" },
+  { id: "bill_receipt", label: "Bill/Receipt" },
+  { id: "sms_screenshot", label: "SMS" },
+  { id: "payment_confirmation", label: "Payment" },
+];
+
+export default function TransactionsClient({
+  initialTransactions,
+  dbError,
+  rates,
+  baseCurrency,
+  currencies,
+  categories,
+}: {
+  initialTransactions: Transaction[];
+  dbError: boolean;
+  rates: Record<string, number>;
+  baseCurrency: string;
+  currencies: string[];
+  categories: string[];
+}) {
   // Extract Upload State
   const [file, setFile] = useState<File | null>(null);
+  const [sourceType, setSourceType] = useState<SourceType>("auto");
   const [isDragActive, setIsDragActive] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<any>(null);
+  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [showUpload, setShowUpload] = useState(false);
 
   // Edit / Delete State
-  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  const [editingTx, setEditingTx] = useState<EditingTransaction | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   // Add State
   const [isAddingTx, setIsAddingTx] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [newTxData, setNewTxData] = useState<any>({ description: "", amount: "", category: "Food & Dining", currency: "MYR", type: "DEBIT", date: new Date().toISOString().slice(0, 10) });
+  const defaultCategory = categories[0] || "Uncategorized";
+  const [newTxData, setNewTxData] = useState<NewTransactionForm>({ description: "", amount: "", category: defaultCategory, currency: baseCurrency, type: "DEBIT", date: new Date().toISOString().slice(0, 10) });
 
-  const EXPENSE_CATEGORIES = ["Food & Dining", "Transport", "Utilities", "Shopping", "Entertainment", "Health & Fitness", "Travel", "Home", "Education", "Personal Care", "Other Expense"];
-  const INCOME_CATEGORIES = ["Salary", "Business", "Investments", "Gifts", "Refund", "Other Income"];
+  const transactionCategories = categories.length > 0 ? categories : ["Uncategorized"];
 
   // Transactions list state (to prepend new ones)
   const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
@@ -101,7 +146,7 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
     if (res.success && res.transaction) {
       setTransactions(prev => [res.transaction as unknown as Transaction, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       setIsAddingTx(false);
-      setNewTxData({ description: "", amount: "", category: "Food & Dining", currency: "MYR", type: "DEBIT", date: new Date().toISOString().slice(0, 10) });
+      setNewTxData({ description: "", amount: "", category: defaultCategory, currency: baseCurrency, type: "DEBIT", date: new Date().toISOString().slice(0, 10) });
     } else {
       alert("Failed to add transaction: " + res.error);
     }
@@ -120,10 +165,15 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
   };
   const handleFileChange = (selectedFile: File | undefined) => {
     setUploadError(null);
+    setUploadResult(null);
     if (!selectedFile) return;
-    const validTypes = ["application/pdf", "image/png", "image/jpeg"];
-    if (!validTypes.includes(selectedFile.type)) {
-      setUploadError("Please upload a PDF, PNG, or JPG file.");
+    const isSupportedFile = selectedFile.type === "application/pdf" || selectedFile.type.startsWith("image/");
+    if (!isSupportedFile) {
+      setUploadError("Please upload a PDF or image file.");
+      return;
+    }
+    if (selectedFile.size > 20 * 1024 * 1024) {
+      setUploadError("Please upload a file smaller than 20MB.");
       return;
     }
     setFile(selectedFile);
@@ -136,18 +186,20 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("sourceType", sourceType);
 
     try {
       const response = await fetch("/api/documents/extract", { method: "POST", body: formData });
-      const data = await response.json();
+      const data = await response.json() as UploadResult;
       if (!response.ok) throw new Error(data.error || "Failed to process document");
       
       setUploadResult(data);
       if (data.transactions) {
-        setTransactions(prev => [...data.transactions, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        const extractedTransactions = data.transactions;
+        setTransactions(prev => [...extractedTransactions, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       }
-    } catch (err: any) {
-      setUploadError(err.message);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Failed to process document");
     } finally {
       setIsUploading(false);
     }
@@ -169,23 +221,29 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
     return Array.from(months).sort((a,b) => b.localeCompare(a));
   }, [transactions]);
 
+  const toBaseAmount = (amount: number, currency: string) => {
+    const rate = rates[currency];
+    if (!currency || currency === baseCurrency || !rate) return amount;
+    return amount / rate;
+  };
+
   // Chart Data Preparation
   const categoryExpenses = useMemo(() => {
     const expenses = filteredTransactions.filter(tx => tx.type === "DEBIT");
     const grouped = expenses.reduce((acc, tx) => {
       const cat = tx.category || "Uncategorized";
-      acc[cat] = Math.round(((acc[cat] || 0) + tx.amount) * 100) / 100;
+      acc[cat] = Math.round(((acc[cat] || 0) + toBaseAmount(tx.amount, tx.currency)) * 100) / 100;
       return acc;
     }, {} as Record<string, number>);
     
     return Object.entries(grouped)
       .map(([name, value]) => ({ name, value }))
       .sort((a,b) => b.value - a.value);
-  }, [filteredTransactions]);
+  }, [filteredTransactions, rates, baseCurrency]);
 
   const currencyStats = useMemo(() => {
     return filteredTransactions.reduce((acc, tx) => {
-      const cur = tx.currency || "MYR";
+      const cur = tx.currency || baseCurrency;
       if (!acc[cur]) acc[cur] = { in: 0, out: 0, cur };
       if (tx.type === "CREDIT") acc[cur].in = Math.round((acc[cur].in + tx.amount) * 100) / 100;
       else acc[cur].out = Math.round((acc[cur].out + tx.amount) * 100) / 100;
@@ -194,38 +252,56 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
   }, [filteredTransactions]);
 
   return (
-    <div className="flex flex-col gap-8 pb-12 w-full mx-auto animate-fade-in">
+    <div className="flex flex-col gap-5 pb-8 w-full mx-auto animate-fade-in sm:gap-8 sm:pb-12">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Transactions</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Transactions</h1>
           <p className="text-zinc-500 mt-1">Review, categorize, and track your cash flow.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:flex">
           <button 
             onClick={() => setIsAddingTx(true)}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.2)] hover:bg-primary/90 transition-colors text-sm font-medium flex items-center gap-2"
+            className="justify-center px-3 py-2 bg-primary text-primary-foreground rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.2)] hover:bg-primary/90 transition-colors text-sm font-medium flex items-center gap-2 sm:px-4"
           >
             <Plus className="w-4 h-4" /> Add Manual
           </button>
           <button 
             onClick={() => setShowUpload(!showUpload)}
             className={clsx(
-              "px-4 py-2 border rounded-xl transition-all text-sm font-medium flex items-center gap-2",
+              "justify-center px-3 py-2 border rounded-xl transition-all text-sm font-medium flex items-center gap-2 sm:px-4",
               showUpload ? "bg-primary/20 border-primary text-primary" : "border-white/10 hover:bg-white/5"
             )}
           >
-            <UploadCloud className="w-4 h-4" /> Extract Document
+            <UploadCloud className="w-4 h-4" /> Extract Data
           </button>
         </div>
       </div>
 
       {/* Upload Section (Collapsible) */}
       {showUpload && (
-        <div className="glass rounded-3xl p-8 border border-white/5 animate-slide-up flex flex-col items-center">
+        <div className="glass rounded-3xl border border-white/5 animate-slide-up flex flex-col items-center p-4 sm:p-8">
+          <div className="mb-5 grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-5">
+            {SOURCE_TYPES.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setSourceType(item.id)}
+                className={clsx(
+                  "rounded-xl border px-3 py-2 text-xs font-bold transition-colors",
+                  sourceType === item.id
+                    ? "border-primary bg-primary/15 text-primary"
+                    : "border-white/10 bg-white/[0.03] text-zinc-400 hover:text-white"
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
           <div 
             className={clsx(
-              "relative border-2 w-full max-w-2xl border-dashed rounded-3xl p-8 flex flex-col items-center justify-center transition-all",
+              "relative border-2 w-full max-w-2xl border-dashed rounded-3xl p-5 sm:p-8 flex flex-col items-center justify-center transition-all",
               isDragActive ? "border-primary bg-primary/5" : "border-white/10 hover:border-white/20 hover:bg-white/5",
               isUploading && "pointer-events-none opacity-50"
             )}
@@ -237,7 +313,15 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
               type="file" 
               ref={fileInputRef} 
               className="hidden" 
-              accept=".pdf,.png,.jpg,.jpeg"
+              accept="application/pdf,image/*,.pdf,.png,.jpg,.jpeg,.webp,.heic,.heif"
+              onChange={(e) => handleFileChange(e.target.files?.[0])}
+            />
+            <input
+              type="file"
+              ref={cameraInputRef}
+              className="hidden"
+              accept="image/*"
+              capture="environment"
               onChange={(e) => handleFileChange(e.target.files?.[0])}
             />
 
@@ -246,24 +330,63 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
             </div>
 
             <h3 className="text-lg font-medium text-foreground mb-1">
-              {isDragActive ? "Drop your file here" : "Click or drag & drop"}
+              {isDragActive ? "Drop your file here" : "Upload financial evidence"}
             </h3>
-            <p className="text-sm text-zinc-500 mb-6">PDF, PNG, JPG (max 10MB approx)</p>
+            <p className="max-w-md text-center text-sm text-zinc-500 mb-6">
+              Bank statements, bills, receipts, invoices, payment confirmations, and SMS screenshots.
+            </p>
+            <p className="mb-6 text-center text-xs font-medium text-zinc-600">PDF or image, up to 20MB</p>
 
             {file && (
               <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-3 w-full max-w-sm mb-6 animate-fade-in">
                 <FileText className="w-5 h-5 text-primary shrink-0" />
-                <span className="text-sm truncate flex-1">{file.name}</span>
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate text-sm">{file.name}</span>
+                  <span className="text-[10px] text-zinc-500">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFile(null);
+                    setUploadResult(null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                    if (cameraInputRef.current) cameraInputRef.current.value = "";
+                  }}
+                  className="rounded-lg px-2 py-1 text-xs font-bold text-zinc-500 hover:bg-white/10 hover:text-white"
+                >
+                  Clear
+                </button>
               </div>
             )}
 
-            <button 
-              onClick={() => file ? uploadAndExtract() : fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-            >
-              {isUploading ? (<><Loader2 className="w-4 h-4 animate-spin" /> Analyzing...</>) : file ? "Extract Transactions" : "Select File"}
-            </button>
+            {file ? (
+              <button 
+                onClick={uploadAndExtract}
+                disabled={isUploading}
+                className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              >
+                {isUploading ? (<><Loader2 className="w-4 h-4 animate-spin" /> Extracting...</>) : "Extract Transactions"}
+              </button>
+            ) : (
+              <div className="grid w-full max-w-sm grid-cols-1 gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="px-4 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                  <Camera className="w-4 h-4" /> Take Photo
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="px-4 py-2.5 border border-white/10 bg-white/[0.03] text-foreground rounded-xl font-medium hover:bg-white/10 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                  <UploadCloud className="w-4 h-4" /> Choose File
+                </button>
+              </div>
+            )}
           </div>
 
           {uploadError && (
@@ -279,14 +402,16 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
           {uploadResult && uploadResult.transactions && (
             <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-2xl p-4 mt-6 max-w-2xl w-full flex items-center gap-3">
               <CheckCircle2 className="w-5 h-5" />
-              <div className="text-sm font-medium">Successfully extracted {uploadResult.transactionsCount} transactions.</div>
+              <div className="text-sm font-medium">
+                Successfully extracted {uploadResult.transactionsCount} transaction{uploadResult.transactionsCount === 1 ? "" : "s"} for review.
+              </div>
             </div>
           )}
         </div>
       )}
 
       {/* KPI Stats by Currency */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
         {Object.values(currencyStats).map((stat) => (
           <div key={stat.cur} className="glass p-5 rounded-3xl border border-white/5 flex flex-col">
              <div className="text-xs text-zinc-500 font-semibold mb-2">{stat.cur} Overview</div>
@@ -312,7 +437,7 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3 lg:gap-8">
         {/* Charts Column */}
         <div className="lg:col-span-1 space-y-8">
           <div className="glass p-6 rounded-3xl border border-white/5 h-[350px]">
@@ -392,15 +517,15 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
               className="bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-sm text-foreground"
             >
               <option value="all">All Currencies</option>
-              <option value="MYR">MYR</option>
-              <option value="USD">USD</option>
-              <option value="LKR">LKR</option>
+              {currencies.map((currency) => (
+                <option key={currency} value={currency}>{currency}</option>
+              ))}
             </select>
           </div>
 
           <div className="glass rounded-3xl overflow-hidden border border-white/5">
             <div className="w-full overflow-x-auto max-h-[600px] overflow-y-auto">
-              <table className="w-full text-sm text-left">
+              <table className="w-full min-w-[760px] text-sm text-left">
                 <thead className="text-xs uppercase sticky top-0 bg-zinc-900/90 backdrop-blur-md text-zinc-400 border-b border-white/5 z-10">
                   <tr>
                     <th className="px-6 py-4 font-medium flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
@@ -461,13 +586,13 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
                             <div>
                               <span className={clsx(
                                 "mr-2 text-xs",
-                                tx.currency === "USD" ? "text-blue-400" : tx.currency === "LKR" ? "text-amber-400" : "text-zinc-400"
+                                tx.currency === baseCurrency ? "text-zinc-400" : "text-blue-400"
                               )}>{tx.currency}</span>
                               {tx.amount.toFixed(2)}
                             </div>
-                            {tx.currency !== "MYR" && rates[tx.currency] && (
+                            {tx.currency !== baseCurrency && rates[tx.currency] && (
                               <div className="text-[10px] text-zinc-500 font-medium tracking-wide">
-                                ≈ MYR {(tx.amount / rates[tx.currency]).toFixed(2)}
+                                ≈ {baseCurrency} {(tx.amount / rates[tx.currency]).toFixed(2)}
                               </div>
                             )}
                           </div>
@@ -525,7 +650,7 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
                     type="number" 
                     step="0.01" 
                     value={editingTx.amount} 
-                    onChange={e => setEditingTx({...editingTx, amount: e.target.value === "" ? ("" as any) : e.target.value as any})}
+                    onChange={e => setEditingTx({...editingTx, amount: e.target.value === "" ? "" : Number(e.target.value)})}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:border-primary outline-none" 
                     required
                   />
@@ -537,9 +662,9 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
                     onChange={e => setEditingTx({...editingTx, currency: e.target.value})}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:border-primary outline-none uppercase"
                   >
-                    <option value="MYR">MYR</option>
-                    <option value="USD">USD</option>
-                    <option value="LKR">LKR</option>
+                    {currencies.map((currency) => (
+                      <option key={currency} value={currency}>{currency}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -563,7 +688,7 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:border-primary outline-none" 
                   >
                     <option value={editingTx.category || ""}>{editingTx.category || "Select Category"}</option>
-                    {(editingTx.type === "CREDIT" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(cat => (
+                    {transactionCategories.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
@@ -636,9 +761,9 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
                     onChange={e => setNewTxData({...newTxData, currency: e.target.value})}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:border-primary outline-none uppercase"
                   >
-                    <option value="MYR">MYR</option>
-                    <option value="USD">USD</option>
-                    <option value="LKR">LKR</option>
+                    {currencies.map((currency) => (
+                      <option key={currency} value={currency}>{currency}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -647,7 +772,7 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
                   <label className="text-xs text-zinc-400 mb-1 block">Type</label>
                   <select 
                     value={newTxData.type} 
-                    onChange={e => setNewTxData({...newTxData, type: e.target.value, category: e.target.value === "CREDIT" ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0]})}
+                    onChange={e => setNewTxData({...newTxData, type: e.target.value, category: defaultCategory})}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:border-primary outline-none"
                   >
                     <option value="DEBIT">Debit (Expense)</option>
@@ -661,7 +786,7 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
                     onChange={e => setNewTxData({...newTxData, category: e.target.value})}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:border-primary outline-none" 
                   >
-                    {(newTxData.type === "CREDIT" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(cat => (
+                    {transactionCategories.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
@@ -691,4 +816,3 @@ export default function TransactionsClient({ initialTransactions, dbError, rates
   );
 }
 // Force hot reload clear
-

@@ -1,7 +1,8 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { MoveRight, Shield, Database, Lock } from "lucide-react";
+import Image from "next/image";
+import { MoveRight, Shield, Database } from "lucide-react";
 
 export default function LoginPage() {
   return (
@@ -14,9 +15,11 @@ export default function LoginPage() {
         <div className="glass rounded-3xl p-10 flex flex-col items-center border border-white/5 shadow-2xl">
           <div className="relative mb-6">
             <div className="absolute inset-0 bg-primary/30 blur-2xl rounded-full animate-pulse" />
-            <img 
+            <Image 
               src="/icon.png" 
               alt="Auditor Logo" 
+              width={80}
+              height={80}
               className="relative h-20 w-20 rounded-2xl shadow-2xl border border-white/10" 
             />
           </div>

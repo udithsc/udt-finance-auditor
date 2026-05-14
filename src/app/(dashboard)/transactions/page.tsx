@@ -1,31 +1,57 @@
 import { prisma } from "@/lib/prisma";
+import type { Transaction } from "@prisma/client";
 import TransactionsClient from "./TransactionsClient";
 import { getExchangeRates } from "@/app/actions/currency";
+import { getAppSettings } from "@/lib/app-settings";
+
+export const dynamic = "force-dynamic";
+
+type ClientTransaction = Omit<Transaction, "date" | "createdAt" | "updatedAt"> & {
+  date: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export default async function TransactionsPage() {
-  let transactions: any[] = [];
+  let transactions: ClientTransaction[] = [];
   let dbError = false;
-  let dbErrorMessage = "";
-  let rates: Record<string, number> = { MYR: 1, USD: 0.21, LKR: 65.0 }; // Fallback
+  const settings = await getAppSettings();
+  let rates: Record<string, number> = { [settings.baseCurrency]: 1 };
   
   try {
     const rawData = await prisma.transaction.findMany({
       orderBy: { date: "desc" },
     });
     // Serialize dates for client component
-    transactions = JSON.parse(JSON.stringify(rawData));
-  } catch (err: any) {
+    transactions = rawData.map((transaction) => ({
+      ...transaction,
+      date: transaction.date.toISOString(),
+      createdAt: transaction.createdAt.toISOString(),
+      updatedAt: transaction.updatedAt.toISOString(),
+    }));
+  } catch (err) {
     console.error("Failed to fetch transactions:", err);
     dbError = true;
-    dbErrorMessage = err.message || "Unknown database error";
   }
 
   try {
-    const rateResult = await getExchangeRates();
+    const rateResult = await getExchangeRates(settings.baseCurrency, Array.from(new Set([
+      ...settings.displayCurrencies,
+      ...transactions.map((transaction) => transaction.currency),
+    ])));
     if (rateResult.success) rates = rateResult.rates;
   } catch (err) {
     console.error("Failed to fetch rates:", err);
   }
 
-  return <TransactionsClient initialTransactions={transactions} dbError={dbError} rates={rates} />;
+  return (
+    <TransactionsClient
+      initialTransactions={transactions}
+      dbError={dbError}
+      rates={rates}
+      baseCurrency={settings.baseCurrency}
+      currencies={settings.displayCurrencies}
+      categories={settings.categories}
+    />
+  );
 }

@@ -2,7 +2,7 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
-export function NetWorthBreakdown({ assets, debts }: { assets: number, debts: number }) {
+export function NetWorthBreakdown({ assets, debts, currency }: { assets: number, debts: number, currency: string }) {
   const data = [
     { name: "Assets", value: assets },
     { name: "Debts", value: debts }
@@ -32,7 +32,7 @@ export function NetWorthBreakdown({ assets, debts }: { assets: number, debts: nu
             <Tooltip 
               contentStyle={{ borderRadius: '8px', background: '#18181b', border: '1px solid rgba(255,255,255,0.1)' }}
               itemStyle={{ color: '#e4e4e7', fontSize: '12px' }}
-              formatter={(value: any) => `RM ${(value).toLocaleString()}`}
+              formatter={(value) => `${currency} ${Number(value).toLocaleString()}`}
             />
           </PieChart>
         </ResponsiveContainer>

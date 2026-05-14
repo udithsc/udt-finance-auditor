@@ -1,9 +1,12 @@
 import { prisma } from "@/lib/prisma";
+import type { Asset, Debt } from "@prisma/client";
 import { Plus, Diamond, Building, Landmark, CreditCard } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export default async function PortfolioPage() {
-  let assets: any[] = [];
-  let debts: any[] = [];
+  let assets: Asset[] = [];
+  let debts: Debt[] = [];
   let dbError = false;
 
   try {
@@ -15,13 +18,13 @@ export default async function PortfolioPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8 pb-12 w-full mx-auto">
+    <div className="flex flex-col gap-5 pb-8 w-full mx-auto sm:gap-8 sm:pb-12">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Assets & Debts</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Assets & Debts</h1>
         <p className="text-zinc-500 mt-1">Manage everything you own and everything you owe.</p>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-8">
+      <div className="grid gap-5 lg:grid-cols-2 lg:gap-8">
         
         {/* Assets Panel */}
         <div className="flex flex-col gap-4">

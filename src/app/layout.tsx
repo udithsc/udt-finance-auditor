@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
+import { PwaInstall } from "@/components/pwa-install";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,17 +15,28 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXTAUTH_URL || "http://localhost:3000"),
   title: "Auditor | Private Finance Engine",
   description: "Self-hosted, highly private personal finance and document extraction engine.",
+  applicationName: "Auditor",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "Auditor",
   },
   formatDetection: {
     telephone: false,
   },
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#050505",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -34,25 +46,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} dark`}>
-      <head>
-        <meta name="theme-color" content="#3b82f6" />
-        <link rel="apple-touch-icon" href="/icon.png" />
-      </head>
       <body className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/30">
         <Providers>
           {children}
+          <PwaInstall />
         </Providers>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js');
-                });
-              }
-            `,
-          }}
-        />
       </body>
     </html>
   );

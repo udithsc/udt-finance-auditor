@@ -110,7 +110,15 @@ const CSE_STOCKS = [
   { symbol: "TILE.N0000", name: "Lanka Tiles" },
 ];
 
-export function AddAssetButton({ rates }: { rates: any }) {
+export function AddAssetButton({
+  rates,
+  baseCurrency,
+  displayCurrencies,
+}: {
+  rates: Record<string, number>;
+  baseCurrency: string;
+  displayCurrencies: string[];
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [isFetchingPrice, setIsFetchingPrice] = useState(false);
@@ -124,7 +132,7 @@ export function AddAssetButton({ rates }: { rates: any }) {
   const [purchasedValue, setPurchasedValue] = useState<string>("");
   const [purchasedAt, setPurchasedAt] = useState<string>("");
 
-  const [goldPrice, setGoldPrice] = useState<number>(620.00); 
+  const [goldPrice, setGoldPrice] = useState<number>(0); 
   const [cryptoPrice, setCryptoPrice] = useState<number>(0);
   const [stockPrice, setStockPrice] = useState<number>(0);
 
@@ -161,15 +169,12 @@ export function AddAssetButton({ rates }: { rates: any }) {
     fetchPrices();
   }, [type, selectedCoin, selectedStock, isOpen]);
 
-  useEffect(() => {
-    if (type === "GOLD" && quantity) {
-      setValue((parseFloat(quantity) * goldPrice).toFixed(2));
-    } else if (type === "CRYPTO" && quantity) {
-      setValue((parseFloat(quantity) * cryptoPrice).toFixed(2));
-    } else if (type === "SHARE" && quantity) {
-      setValue((parseFloat(quantity) * stockPrice).toFixed(2));
-    }
-  }, [type, quantity, goldPrice, cryptoPrice, stockPrice]);
+  const quantityValue = Number.parseFloat(quantity);
+  const marketUnitPrice = type === "GOLD" ? goldPrice : type === "CRYPTO" ? cryptoPrice : type === "SHARE" ? stockPrice : null;
+  const calculatedValue = marketUnitPrice !== null && Number.isFinite(quantityValue)
+    ? (quantityValue * marketUnitPrice).toFixed(2)
+    : null;
+  const currentValue = calculatedValue ?? value;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -188,13 +193,14 @@ export function AddAssetButton({ rates }: { rates: any }) {
     }
   }
 
-  const numValue = parseFloat(value) || 0;
+  const numValue = parseFloat(currentValue) || 0;
+  const previewCurrencies = Array.from(new Set([baseCurrency, ...displayCurrencies]));
 
   return (
     <>
       <button 
         onClick={() => setIsOpen(true)}
-        className="px-4 py-2 text-sm font-medium flex items-center gap-2 bg-primary hover:bg-primary/90 text-white rounded-xl transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+        className="w-full justify-center px-4 py-2.5 text-sm font-medium flex items-center gap-2 bg-primary hover:bg-primary/90 text-white rounded-xl transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)] sm:w-auto"
       >
         <Plus className="w-4 h-4"/> Add New Asset
       </button>
@@ -269,14 +275,15 @@ export function AddAssetButton({ rates }: { rates: any }) {
               </div>
             ) : (
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Live Value (MYR)</label>
+                <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Live Value ({baseCurrency})</label>
                 <input 
                   required 
                   name="value" 
                   type="number" 
                   step="0.01" 
                   placeholder="0.00" 
-                  value={value}
+                  value={currentValue}
+                  readOnly={type === "GOLD" && calculatedValue !== null}
                   onChange={(e) => setValue(e.target.value)}
                   className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-mono" 
                 />
@@ -286,7 +293,7 @@ export function AddAssetButton({ rates }: { rates: any }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Purchase Price (MYR)</label>
+              <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Purchase Price ({baseCurrency})</label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                 <input 
@@ -343,7 +350,7 @@ export function AddAssetButton({ rates }: { rates: any }) {
                   <span className={clsx(
                     type === "GOLD" ? "text-amber-500/80" : type === "CRYPTO" ? "text-primary/80" : "text-emerald-500/80"
                   )}>
-                    Live: RM {type === "GOLD" ? goldPrice.toFixed(2) : type === "CRYPTO" ? cryptoPrice.toLocaleString() : stockPrice.toFixed(2)}
+                    Live: {baseCurrency} {type === "GOLD" ? goldPrice.toFixed(2) : type === "CRYPTO" ? cryptoPrice.toLocaleString() : stockPrice.toFixed(2)}
                   </span>
                 </div>
               )}
@@ -352,8 +359,8 @@ export function AddAssetButton({ rates }: { rates: any }) {
 
           {(type === "CRYPTO" || type === "SHARE") && (
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Calculated Current Value (MYR)</label>
-              <input readOnly name="value" value={value} className="bg-primary/10 border border-primary/20 rounded-xl px-4 py-3 text-primary font-bold focus:outline-none font-mono" />
+              <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Calculated Current Value ({baseCurrency})</label>
+              <input readOnly name="value" value={currentValue} className="bg-primary/10 border border-primary/20 rounded-xl px-4 py-3 text-primary font-bold focus:outline-none font-mono" />
             </div>
           )}
 
@@ -363,19 +370,15 @@ export function AddAssetButton({ rates }: { rates: any }) {
                <Globe className="w-3.5 h-3.5" />
                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Multi-Currency Assessment</span>
              </div>
-             <div className="grid grid-cols-3 gap-2">
-                <div className="flex flex-col">
-                  <span className="text-[8px] uppercase font-bold text-zinc-500">MYR Value</span>
-                  <span className="text-sm font-bold text-white">{(numValue).toLocaleString()}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[8px] uppercase font-bold text-zinc-500">USD Value</span>
-                  <span className="text-sm font-bold text-zinc-400">{(numValue * rates.USD).toLocaleString()}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[8px] uppercase font-bold text-zinc-500">LKR Value</span>
-                  <span className="text-sm font-bold text-zinc-400">{(numValue * rates.LKR).toLocaleString()}</span>
-                </div>
+             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {previewCurrencies.map((currency, index) => (
+                  <div className="flex flex-col" key={currency}>
+                    <span className="text-[8px] uppercase font-bold text-zinc-500">{currency} Value</span>
+                    <span className={clsx("text-sm font-bold", index === 0 ? "text-white" : "text-zinc-400")}>
+                      {(numValue * (rates[currency] || 1)).toLocaleString()}
+                    </span>
+                  </div>
+                ))}
              </div>
           </div>
 
